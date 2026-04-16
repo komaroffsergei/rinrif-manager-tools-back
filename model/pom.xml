@@ -1,0 +1,18 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>ru.reinform.rinrif.managertools</groupId>
+    <artifactId>manager-tools-model</artifactId>
+    <version>internal</version>
+    <packaging>jar</packaging>
+    <name>manager-tools-model</name>
+
+    <parent>
+        <groupId>ru.reinform.cdp.maven-master</groupId>
+        <artifactId>lib-master</artifactId>
+        <version>5.0</version>
+        <relativePath/>
+    </parent>
+</project>

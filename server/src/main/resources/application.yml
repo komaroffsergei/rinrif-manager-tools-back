@@ -1,0 +1,3 @@
+#logging:
+#  level:
+#    ru.reinform.rinrif.managertools: debug

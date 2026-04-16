@@ -1,0 +1,15 @@
+spring:
+  main:
+    allow-bean-definition-overriding: true
+  cloud:
+    config:
+      fail-fast: true
+      uri: http://app.cdp.local:5000/conf
+  application:
+    name: rinrif_manager_tools
+app:
+  subsystem: RINRIF_MANAGER_TOOLS
+server:
+  port: 6756
+  servlet:
+    contextPath: /manager-tools

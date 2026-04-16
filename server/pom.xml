@@ -1,0 +1,50 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>ru.reinform.rinrif.managertools</groupId>
+    <artifactId>manager-tools-server</artifactId>
+    <version>5.0-SNAPSHOT</version>
+    <name>manager-tools-server</name>
+
+    <parent>
+        <groupId>ru.reinform.cdp.maven-master</groupId>
+        <artifactId>rest-master</artifactId>
+        <version>5.0</version>
+        <relativePath/>
+    </parent>
+
+    <properties>
+        <rinrif-common-lib.version>5.0-SNAPSHOT</rinrif-common-lib.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>ru.reinform.rinrif.managertools</groupId>
+            <artifactId>manager-tools-core</artifactId>
+            <version>internal</version>
+        </dependency>
+        <dependency>
+            <groupId>ru.reinform.cdp.utils</groupId>
+            <artifactId>utils-springboot-lib</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ru.reinform.cdp.utils</groupId>
+            <artifactId>utils-rest-lib</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ru.reinform.cdp</groupId>
+            <artifactId>security-lib</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ru.reinform.rinrif</groupId>
+            <artifactId>rinrif-common-lib</artifactId>
+            <version>${rinrif-common-lib.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>manager-tools</finalName>
+    </build>
+</project>

@@ -1,0 +1,11 @@
+spring:
+  cloud:
+    config:
+      fail-fast: true
+      uri: http://smart-app01-dev.ref-tl.local:5000/conf
+  application:
+    name: rinrif_manager_tools
+server:
+  port: 6756
+  servlet:
+    contextPath: /app/rinrif/manager-tools
