@@ -3,7 +3,7 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>ru.reinform.rinrif.managertools</groupId>
+    <groupId>ru.reinform.rinrif.manager-tools</groupId>
     <artifactId>manager-tools-server</artifactId>
     <version>5.0-SNAPSHOT</version>
     <name>manager-tools-server</name>
@@ -21,7 +21,7 @@
 
     <dependencies>
         <dependency>
-            <groupId>ru.reinform.rinrif.managertools</groupId>
+            <groupId>ru.reinform.rinrif.manager-tools</groupId>
             <artifactId>manager-tools-core</artifactId>
             <version>internal</version>
         </dependency>
