@@ -26,6 +26,10 @@ class RepositoryManager {
         mirrorService.cloneMirror(repository.url, Paths.get(repository.localPath));
     }
 
+    void cloneMirror(RepositoryRecord repository, String cloneUrl) {
+        mirrorService.cloneMirror(cloneUrl, Paths.get(repository.localPath));
+    }
+
     void updateMirror(RepositoryRecord repository) {
         Path localPath = Paths.get(repository.localPath);
         mirrorService.verifyMirror(localPath);

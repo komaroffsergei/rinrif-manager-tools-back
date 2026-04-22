@@ -164,7 +164,7 @@ class GitMirrorService {
         } catch (IOException error) {
             throw new AppException("CLONE_FAILED", "Failed to prepare mirror directory.", 500, error.getMessage());
         } catch (GitAPIException error) {
-            throw mapGitFailure(gitAuth.redact(error.getMessage()), "CLONE_FAILED", "Failed to clone repository");
+            throw mapGitFailure(redact(error.getMessage()), "CLONE_FAILED", "Failed to clone repository");
         }
     }
 
@@ -189,7 +189,7 @@ class GitMirrorService {
         } catch (IOException error) {
             throw new AppException("BROKEN_REPOSITORY", "Local repository mirror is missing or broken.", 409, error.getMessage());
         } catch (GitAPIException error) {
-            throw mapGitFailure(gitAuth.redact(error.getMessage()), "FETCH_FAILED", "Failed to update repository");
+            throw mapGitFailure(redact(error.getMessage()), "FETCH_FAILED", "Failed to update repository");
         }
     }
 
@@ -311,6 +311,11 @@ class GitMirrorService {
             throw new AppException("BROKEN_REPOSITORY", "Remote repository URL is missing.", 409);
         }
         return remoteUrl;
+    }
+
+    private String redact(String value) {
+        String redacted = gitAuth.redact(value);
+        return redacted == null ? null : redacted.replaceAll("(?i)(https?://)[^\\s/@]+@", "$1***@");
     }
 
     private AppException mapGitFailure(String stderr, String defaultCode, String fallbackMessage) {

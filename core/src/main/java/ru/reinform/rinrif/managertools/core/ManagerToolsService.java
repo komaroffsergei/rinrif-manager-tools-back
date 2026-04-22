@@ -90,13 +90,14 @@ public class ManagerToolsService {
         repository.updatedAt = now;
 
         repositoryRegistry.createRepository(repository);
+        final String cloneUrl = normalized.cloneUrl;
         Map<String, Object> payload = new LinkedHashMap<String, Object>();
         payload.put("url", repository.normalizedUrl);
         final SearchJobRecord job = jobsStore.createJob(JobType.clone, repository.id, payload, "Clone queued");
         RepoQueueManager.QueueTaskHandle handle = queueManager.enqueue(repository.id, job.jobId, new RepoQueueManager.RunnableTask() {
             @Override
             public void run() {
-                executeClone(repository.id, job.jobId);
+                executeClone(repository.id, job.jobId, cloneUrl);
             }
         });
         return new AddRepositoryResponse(toSummary(repository), job.jobId, handle.queuePosition, false);
@@ -140,12 +141,12 @@ public class ManagerToolsService {
         return jobsStore.getJob(jobId);
     }
 
-    private void executeClone(String repoId, String jobId) {
+    private void executeClone(String repoId, String jobId, String cloneUrl) {
         repositoryRegistry.updateRepositoryStatus(repoId, RepositoryStatus.cloning);
         jobsStore.updateJob(jobId, JobStatus.running, "Cloning repository", 0);
         try {
             RepositoryRecord repository = repositoryRegistry.getRepository(repoId);
-            repositoryManager.cloneMirror(repository);
+            repositoryManager.cloneMirror(repository, cloneUrl);
             RepositoryRecord readyRecord = repositoryRegistry.getRepository(repoId);
             readyRecord.status = RepositoryStatus.ready;
             readyRecord.sizeBytes = repositoryManager.calculateRepositorySize(Paths.get(readyRecord.localPath));
@@ -279,6 +280,7 @@ public class ManagerToolsService {
 
         NormalizedRepositoryUrl result = new NormalizedRepositoryUrl();
         result.url = protocol + "://" + host + pathname + ".git";
+        result.cloneUrl = protocol + "://" + (parsedUrl.getUserInfo() == null ? host : parsedUrl.getUserInfo() + "@" + host) + pathname + ".git";
         result.normalizedUrl = protocol + "://" + host + pathname;
         result.host = host;
         result.name = pathname.replaceAll("^/+", "");
@@ -287,6 +289,7 @@ public class ManagerToolsService {
 
     private static class NormalizedRepositoryUrl {
         String url;
+        String cloneUrl;
         String normalizedUrl;
         String host;
         String name;
