@@ -32,6 +32,7 @@ public final class ApiModels {
     }
 
     public enum JobType {
+        clone,
         search,
         update,
         delete
@@ -147,12 +148,22 @@ public final class ApiModels {
 
     public static class AddRepositoryResponse {
         public RepositorySummary repository;
+        public String jobId;
+        public Integer queuePosition;
+        public Boolean existing;
 
         public AddRepositoryResponse() {
         }
 
         public AddRepositoryResponse(RepositorySummary repository) {
             this.repository = repository;
+        }
+
+        public AddRepositoryResponse(RepositorySummary repository, String jobId, Integer queuePosition, Boolean existing) {
+            this.repository = repository;
+            this.jobId = jobId;
+            this.queuePosition = queuePosition;
+            this.existing = existing;
         }
     }
 

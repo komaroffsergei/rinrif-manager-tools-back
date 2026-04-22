@@ -1,11 +1,12 @@
 package ru.reinform.rinrif.managertools.core;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import ru.reinform.rinrif.managertools.model.ApiModels;
+import ru.reinform.rinrif.managertools.model.ApiModels.AddRepositoryResponse;
 import ru.reinform.rinrif.managertools.model.ApiModels.JobStatus;
 import ru.reinform.rinrif.managertools.model.ApiModels.JobType;
 import ru.reinform.rinrif.managertools.model.ApiModels.QueuedJobResponse;
 import ru.reinform.rinrif.managertools.model.ApiModels.RepositoryRecord;
+import ru.reinform.rinrif.managertools.model.ApiModels.RepositorySummary;
 import ru.reinform.rinrif.managertools.model.ApiModels.RepositoryStatus;
 import ru.reinform.rinrif.managertools.model.ApiModels.SearchJobRecord;
 import ru.reinform.rinrif.managertools.model.ApiModels.SearchRequestPayload;
@@ -69,15 +70,15 @@ public class ManagerToolsService {
         return repositoryRegistry.getRepository(repoId);
     }
 
-    public RepositoryRecord addRepository(String inputUrl) {
+    public AddRepositoryResponse addRepository(String inputUrl) {
         NormalizedRepositoryUrl normalized = normalizeRepositoryUrl(inputUrl, config);
         RepositoryRecord existing = repositoryRegistry.findByNormalizedUrl(normalized.normalizedUrl);
         if (existing != null) {
-            throw new AppException("REPOSITORY_ALREADY_EXISTS", "Repository is already added.", 409);
+            return new AddRepositoryResponse(toSummary(existing), null, null, true);
         }
 
         String now = CoreUtils.nowIso();
-        RepositoryRecord repository = new RepositoryRecord();
+        final RepositoryRecord repository = new RepositoryRecord();
         repository.id = CoreUtils.createIdentifier("repo");
         repository.name = normalized.name;
         repository.url = normalized.url;
@@ -90,20 +91,16 @@ public class ManagerToolsService {
         repository.updatedAt = now;
 
         repositoryRegistry.createRepository(repository);
-        try {
-            repositoryManager.cloneMirror(repository);
-            RepositoryRecord readyRecord = repositoryRegistry.getRepository(repository.id);
-            readyRecord.status = RepositoryStatus.ready;
-            readyRecord.sizeBytes = repositoryManager.calculateRepositorySize(Paths.get(readyRecord.localPath));
-            readyRecord.lastFetchedAt = CoreUtils.nowIso();
-            readyRecord.updatedAt = CoreUtils.nowIso();
-            repositoryRegistry.updateRepository(readyRecord);
-            return readyRecord;
-        } catch (RuntimeException error) {
-            repositoryManager.removeMirror(repository);
-            repositoryRegistry.deleteRepository(repository.id);
-            throw error;
-        }
+        Map<String, Object> payload = new LinkedHashMap<String, Object>();
+        payload.put("url", repository.normalizedUrl);
+        final SearchJobRecord job = jobsStore.createJob(JobType.clone, repository.id, payload, "Clone queued");
+        RepoQueueManager.QueueTaskHandle handle = queueManager.enqueue(repository.id, job.jobId, new RepoQueueManager.RunnableTask() {
+            @Override
+            public void run() {
+                executeClone(repository.id, job.jobId);
+            }
+        });
+        return new AddRepositoryResponse(toSummary(repository), job.jobId, handle.queuePosition, false);
     }
 
     public QueuedJobResponse startUpdate(String repoId) {
@@ -144,6 +141,26 @@ public class ManagerToolsService {
         return jobsStore.getJob(jobId);
     }
 
+    private void executeClone(String repoId, String jobId) {
+        repositoryRegistry.updateRepositoryStatus(repoId, RepositoryStatus.cloning);
+        jobsStore.updateJob(jobId, JobStatus.running, "Cloning repository", 0);
+        try {
+            RepositoryRecord repository = repositoryRegistry.getRepository(repoId);
+            repositoryManager.cloneMirror(repository);
+            RepositoryRecord readyRecord = repositoryRegistry.getRepository(repoId);
+            readyRecord.status = RepositoryStatus.ready;
+            readyRecord.sizeBytes = repositoryManager.calculateRepositorySize(Paths.get(readyRecord.localPath));
+            readyRecord.lastFetchedAt = CoreUtils.nowIso();
+            readyRecord.updatedAt = CoreUtils.nowIso();
+            repositoryRegistry.updateRepository(readyRecord);
+            jobsStore.finishJob(jobId, "Clone completed", new SearchResult());
+        } catch (RuntimeException error) {
+            cleanupFailedClone(repoId);
+            jobsStore.failJob(jobId, error, "Clone failed");
+            throw error;
+        }
+    }
+
     private void executeUpdate(String repoId, String jobId) {
         repositoryRegistry.updateRepositoryStatus(repoId, RepositoryStatus.updating);
         jobsStore.updateJob(jobId, JobStatus.updating_repository, "Updating repository", 0);
@@ -182,6 +199,19 @@ public class ManagerToolsService {
         }
     }
 
+    private void cleanupFailedClone(String repoId) {
+        RepositoryRecord repository = repositoryRegistry.findRepository(repoId);
+        if (repository == null) {
+            return;
+        }
+        try {
+            repositoryManager.removeMirror(repository);
+        } catch (RuntimeException ignored) {
+            // Keep the original clone failure in the job response.
+        }
+        repositoryRegistry.deleteRepository(repoId);
+    }
+
     private void handleRepositoryFailure(String repoId, RuntimeException error) {
         RepositoryRecord repository = repositoryRegistry.findRepository(repoId);
         if (repository == null) {
@@ -199,6 +229,10 @@ public class ManagerToolsService {
         if (repository != null && repository.status == RepositoryStatus.ready) {
             repositoryRegistry.updateRepositoryStatus(repoId, RepositoryStatus.queued);
         }
+    }
+
+    private static RepositorySummary toSummary(RepositoryRecord repository) {
+        return new RepositorySummary(repository.id, repository.name, repository.status);
     }
 
     private static void await(java.util.concurrent.CompletableFuture<Void> completion) {

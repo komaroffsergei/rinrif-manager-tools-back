@@ -35,7 +35,7 @@ class AppConfig {
     static AppConfig load(Map<String, String> externalValues) {
         return new AppConfig(
                 Paths.get(readConfig(externalValues, "MANAGER_TOOLS_STORAGE_ROOT", "storage")),
-                Long.parseLong(readConfig(externalValues, "GIT_COMMAND_TIMEOUT_MS", "30000")),
+                Long.parseLong(readConfig(externalValues, "GIT_COMMAND_TIMEOUT_MS", "300000")),
                 Integer.parseInt(readConfig(externalValues, "SEARCH_MAX_QUERY_LENGTH", "512")),
                 Integer.parseInt(readConfig(externalValues, "SEARCH_DEFAULT_MAX_COMMITS", "30")),
                 Integer.parseInt(readConfig(externalValues, "SEARCH_SCAN_LIMIT", "1000")),

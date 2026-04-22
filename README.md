@@ -43,7 +43,7 @@ Optional environment:
 
 ```text
 MANAGER_TOOLS_STORAGE_ROOT=storage
-GIT_COMMAND_TIMEOUT_MS=30000
+GIT_COMMAND_TIMEOUT_MS=300000
 SEARCH_MAX_QUERY_LENGTH=512
 SEARCH_DEFAULT_MAX_COMMITS=30
 SEARCH_SCAN_LIMIT=1000
@@ -58,7 +58,7 @@ manager-tools:
     base-url: https://builder.reinform-int.ru/gitlab
     pat: ${MANAGER_TOOLS_GITLAB_PAT:}
   git:
-    command-timeout-ms: 30000
+    command-timeout-ms: 300000
   search:
     max-query-length: 512
     default-max-commits: 30

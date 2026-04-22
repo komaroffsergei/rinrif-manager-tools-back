@@ -13,7 +13,6 @@ import ru.reinform.rinrif.managertools.model.ApiModels.AddRepositoryResponse;
 import ru.reinform.rinrif.managertools.model.ApiModels.DeleteResponse;
 import ru.reinform.rinrif.managertools.model.ApiModels.QueuedJobResponse;
 import ru.reinform.rinrif.managertools.model.ApiModels.RepositoryRecord;
-import ru.reinform.rinrif.managertools.model.ApiModels.RepositorySummary;
 import ru.reinform.rinrif.managertools.model.ApiModels.SearchJobRecord;
 import ru.reinform.rinrif.managertools.model.ApiModels.SearchRequestPayload;
 
@@ -40,8 +39,7 @@ public class ManagerToolsController {
 
     @PostMapping("/repositories")
     public AddRepositoryResponse addRepository(@RequestBody AddRepositoryRequest request) {
-        RepositoryRecord repository = managerToolsService.addRepository(request == null ? "" : request.url);
-        return new AddRepositoryResponse(new RepositorySummary(repository.id, repository.name, repository.status));
+        return managerToolsService.addRepository(request == null ? "" : request.url);
     }
 
     @PostMapping("/repositories/{repoId}/update")
