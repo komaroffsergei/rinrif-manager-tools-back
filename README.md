@@ -8,7 +8,7 @@ The project follows the RINRIF backend layout used by `adm`: Maven multi-module 
 
 - Java 8
 - Maven 3.5.2
-- Native `git` CLI available in `PATH`
+- Repository operations are executed through embedded JGit
 
 ## Local Run
 

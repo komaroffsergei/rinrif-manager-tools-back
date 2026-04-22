@@ -23,6 +23,16 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import org.eclipse.jgit.api.FetchCommand;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.TransportCommand;
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
+import org.eclipse.jgit.transport.RefSpec;
+import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
+
 class GitAuth {
     private final AppConfig config;
 
@@ -48,6 +58,13 @@ class GitAuth {
             result = result.replace(config.gitLabPat, "***").replace(encodedAuth(), "***");
         }
         return result;
+    }
+
+    void applyCredentials(TransportCommand<?, ?> command) {
+        if (config.gitLabPat != null) {
+            command.setCredentialsProvider(new UsernamePasswordCredentialsProvider("oauth2", config.gitLabPat));
+        }
+        command.setTimeout((int) Math.max(1L, TimeUnit.MILLISECONDS.toSeconds(config.gitCommandTimeoutMs)));
     }
 
     private String encodedAuth() {
@@ -118,41 +135,68 @@ class GitRunResult {
 }
 
 class GitMirrorService {
-    private final GitRunner gitRunner;
     private final GitAuth gitAuth;
 
-    GitMirrorService(GitRunner gitRunner, GitAuth gitAuth) {
-        this.gitRunner = gitRunner;
+    GitMirrorService(GitAuth gitAuth) {
         this.gitAuth = gitAuth;
     }
 
     void cloneMirror(String repositoryUrl, Path localPath) {
         try {
             Files.createDirectories(localPath.getParent());
+            org.eclipse.jgit.api.CloneCommand command = Git.cloneRepository()
+                    .setURI(repositoryUrl)
+                    .setDirectory(localPath.toFile())
+                    .setBare(true)
+                    .setMirror(true)
+                    .setCloneAllBranches(true);
+            gitAuth.applyCredentials(command);
+            Git git = command.call();
+            try {
+                fetchAllRefs(git);
+            } finally {
+                git.close();
+            }
         } catch (IOException error) {
             throw new AppException("CLONE_FAILED", "Failed to prepare mirror directory.", 500, error.getMessage());
-        }
-        List<String> args = new ArrayList<String>(gitAuth.cloneAndFetchArgs());
-        Collections.addAll(args, "clone", "--mirror", repositoryUrl, localPath.toString());
-        GitRunResult result = gitRunner.run(args);
-        if (result.exitCode != 0) {
-            throw mapGitFailure(result.stderr, "CLONE_FAILED", "Failed to clone repository");
+        } catch (GitAPIException error) {
+            throw mapGitFailure(gitAuth.redact(error.getMessage()), "CLONE_FAILED", "Failed to clone repository");
         }
     }
 
     void updateMirror(Path localPath) {
-        List<String> args = new ArrayList<String>(gitAuth.cloneAndFetchArgs());
-        Collections.addAll(args, "-C", localPath.toString(), "fetch", "--prune", "origin");
-        GitRunResult result = gitRunner.run(args);
-        if (result.exitCode != 0) {
-            throw mapGitFailure(result.stderr, "FETCH_FAILED", "Failed to update repository");
+        try {
+            Repository repository = openRepository(localPath);
+            try {
+                Git git = new Git(repository);
+                try {
+                    fetchAllRefs(git);
+                } finally {
+                    git.close();
+                }
+            } finally {
+                repository.close();
+            }
+        } catch (IOException error) {
+            throw new AppException("BROKEN_REPOSITORY", "Local repository mirror is missing or broken.", 409, error.getMessage());
+        } catch (GitAPIException error) {
+            throw mapGitFailure(gitAuth.redact(error.getMessage()), "FETCH_FAILED", "Failed to update repository");
         }
     }
 
     void verifyMirror(Path localPath) {
-        GitRunResult result = gitRunner.run(GitSupport.args("-C", localPath.toString(), "rev-parse", "--is-bare-repository"));
-        if (result.exitCode != 0 || !"true".equals(result.stdout.trim())) {
+        Repository repository = null;
+        try {
+            repository = openRepository(localPath);
+            if (!repository.isBare() || !repository.getObjectDatabase().exists()) {
+                throw new AppException("BROKEN_REPOSITORY", "Local repository mirror is missing or broken.", 409);
+            }
+        } catch (IOException error) {
             throw new AppException("BROKEN_REPOSITORY", "Local repository mirror is missing or broken.", 409);
+        } finally {
+            if (repository != null) {
+                repository.close();
+            }
         }
     }
 
@@ -179,9 +223,21 @@ class GitMirrorService {
         }
     }
 
+    private void fetchAllRefs(Git git) throws GitAPIException {
+        List<RefSpec> refSpecs = new ArrayList<RefSpec>();
+        refSpecs.add(new RefSpec("+refs/heads/*:refs/remotes/origin/*"));
+        refSpecs.add(new RefSpec("+refs/tags/*:refs/tags/*"));
+        FetchCommand command = git.fetch()
+                .setRemote("origin")
+                .setRemoveDeletedRefs(true)
+                .setRefSpecs(refSpecs);
+        gitAuth.applyCredentials(command);
+        command.call();
+    }
+
     private AppException mapGitFailure(String stderr, String defaultCode, String fallbackMessage) {
         String lowered = CoreUtils.safe(stderr).toLowerCase(Locale.ROOT);
-        if (lowered.contains("authentication failed") || lowered.contains("http basic: access denied") || lowered.contains("access denied") || lowered.contains("could not read username")) {
+        if (lowered.contains("authentication failed") || lowered.contains("authentication is required") || lowered.contains("http basic: access denied") || lowered.contains("access denied") || lowered.contains("not authorized") || lowered.contains("could not read username")) {
             return new AppException("AUTH_FAILED", "GitLab authentication failed.", 401);
         }
         if (lowered.contains("repository not found") || lowered.contains("not found")) {
@@ -192,10 +248,7 @@ class GitMirrorService {
 }
 
 class GitRefsService {
-    private final GitRunner gitRunner;
-
-    GitRefsService(GitRunner gitRunner) {
-        this.gitRunner = gitRunner;
+    GitRefsService() {
     }
 
     String resolveRef(Path localPath, String inputRef) {
@@ -203,14 +256,20 @@ class GitRefsService {
         if (normalizedInput.isEmpty()) {
             throw new AppException("REF_NOT_FOUND", "Ref or branch is required.", 400);
         }
-        GitRunResult result = gitRunner.run(GitSupport.args("-C", localPath.toString(), "for-each-ref", "--format=%(refname)", "refs/heads", "refs/tags", "refs/remotes"));
-        if (result.exitCode != 0) {
-            throw new AppException("BROKEN_REPOSITORY", "Failed to read local mirror refs.", 409);
-        }
         Set<String> refs = new HashSet<String>();
-        for (String line : result.stdout.split("\\r?\\n")) {
-            if (!line.trim().isEmpty()) {
-                refs.add(line.trim());
+        Repository repository = null;
+        try {
+            repository = GitSupport.openRepository(localPath);
+            for (Ref ref : repository.getAllRefs().values()) {
+                if (ref.getName().startsWith("refs/heads/") || ref.getName().startsWith("refs/tags/") || ref.getName().startsWith("refs/remotes/")) {
+                    refs.add(ref.getName());
+                }
+            }
+        } catch (IOException error) {
+            throw new AppException("BROKEN_REPOSITORY", "Failed to read local mirror refs.", 409);
+        } finally {
+            if (repository != null) {
+                repository.close();
             }
         }
         List<String> candidates = new ArrayList<String>();
@@ -239,5 +298,11 @@ class GitSupport {
         List<String> result = new ArrayList<String>();
         Collections.addAll(result, values);
         return result;
+    }
+
+    static Repository openRepository(Path localPath) throws IOException {
+        return new FileRepositoryBuilder()
+                .setGitDir(localPath.toFile())
+                .build();
     }
 }

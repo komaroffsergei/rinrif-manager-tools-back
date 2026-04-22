@@ -45,11 +45,10 @@ public class ManagerToolsService {
         this.jobsStore = new JobsStore(config.storageRoot, objectMapper);
         this.queueManager = new RepoQueueManager(jobsStore);
         GitAuth gitAuth = new GitAuth(config);
-        GitRunner gitRunner = new GitRunner(config, gitAuth);
         this.repositoryManager = new RepositoryManager(
-                new GitMirrorService(gitRunner, gitAuth),
-                new GitRefsService(gitRunner),
-                new GitLogService(gitRunner)
+                new GitMirrorService(gitAuth),
+                new GitRefsService(),
+                new GitLogService()
         );
         this.searchService = new SearchService(config, repositoryRegistry, repositoryManager, queueManager, jobsStore);
         this.repositoryRegistry.ensureInitialized();
