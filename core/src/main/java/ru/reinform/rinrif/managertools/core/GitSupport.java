@@ -166,7 +166,7 @@ class GitMirrorService {
 
     void updateMirror(Path localPath) {
         try {
-            Repository repository = openRepository(localPath);
+            Repository repository = GitSupport.openRepository(localPath);
             try {
                 Git git = new Git(repository);
                 try {
@@ -187,7 +187,7 @@ class GitMirrorService {
     void verifyMirror(Path localPath) {
         Repository repository = null;
         try {
-            repository = openRepository(localPath);
+            repository = GitSupport.openRepository(localPath);
             if (!repository.isBare() || !repository.getObjectDatabase().exists()) {
                 throw new AppException("BROKEN_REPOSITORY", "Local repository mirror is missing or broken.", 409);
             }
