@@ -4,6 +4,8 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.URL;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -68,6 +70,37 @@ class GitAuth {
             command.setCredentialsProvider(new UsernamePasswordCredentialsProvider("oauth2", config.gitLabPat));
         }
         command.setTimeout((int) Math.max(1L, TimeUnit.MILLISECONDS.toSeconds(config.gitCommandTimeoutMs)));
+    }
+
+    void applyCredentials(TransportCommand<?, ?> command, String remoteUrl) {
+        if (config.gitLabPat != null) {
+            applyCredentials(command);
+            return;
+        }
+        UsernamePasswordCredentialsProvider credentials = credentialsFromUrl(remoteUrl);
+        if (credentials != null) {
+            command.setCredentialsProvider(credentials);
+        }
+        command.setTimeout((int) Math.max(1L, TimeUnit.MILLISECONDS.toSeconds(config.gitCommandTimeoutMs)));
+    }
+
+    private UsernamePasswordCredentialsProvider credentialsFromUrl(String remoteUrl) {
+        try {
+            String userInfo = new URL(remoteUrl).getUserInfo();
+            if (userInfo == null || userInfo.trim().isEmpty()) {
+                return null;
+            }
+            String[] parts = userInfo.split(":", 2);
+            String username = decode(parts[0]);
+            String password = parts.length > 1 ? decode(parts[1]) : "";
+            return new UsernamePasswordCredentialsProvider(username, password);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private String decode(String value) throws Exception {
+        return URLDecoder.decode(value, StandardCharsets.UTF_8.name());
     }
 
     private String encodedAuth() {
@@ -244,7 +277,7 @@ class GitMirrorService {
                 .setRemote("origin")
                 .setRemoveDeletedRefs(true)
                 .setRefSpecs(new RefSpec("+" + remoteRef + ":" + localRef));
-        gitAuth.applyCredentials(command);
+        gitAuth.applyCredentials(command, readRemoteUrl(git.getRepository()));
         command.call();
     }
 
@@ -287,7 +320,7 @@ class GitMirrorService {
                 .setRemote(remoteUrl)
                 .setHeads(true)
                 .setTags(true);
-        gitAuth.applyCredentials(command);
+        gitAuth.applyCredentials(command, remoteUrl);
         return command.call();
     }
 
