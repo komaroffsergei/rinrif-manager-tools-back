@@ -32,6 +32,12 @@ class RepositoryManager {
         mirrorService.updateMirror(localPath);
     }
 
+    void updateMirror(RepositoryRecord repository, String inputRef) {
+        Path localPath = Paths.get(repository.localPath);
+        mirrorService.verifyMirror(localPath);
+        mirrorService.updateMirror(localPath, inputRef);
+    }
+
     void removeMirror(RepositoryRecord repository) {
         mirrorService.removeMirror(Paths.get(repository.localPath));
     }

@@ -60,7 +60,7 @@ class SearchService {
         try {
             repositoryRegistry.updateRepositoryStatus(repository.id, RepositoryStatus.updating);
             jobsStore.updateJob(jobId, JobStatus.updating_repository, "Updating repository", 0);
-            repositoryManager.updateMirror(repository);
+            repositoryManager.updateMirror(repository, input.ref);
 
             RepositoryRecord refreshedRepository = repositoryRegistry.getRepository(repository.id);
             refreshedRepository.lastFetchedAt = CoreUtils.nowIso();

@@ -12,8 +12,10 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -29,6 +31,7 @@ import org.eclipse.jgit.api.TransportCommand;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
@@ -144,16 +147,17 @@ class GitMirrorService {
     void cloneMirror(String repositoryUrl, Path localPath) {
         try {
             Files.createDirectories(localPath.getParent());
-            org.eclipse.jgit.api.CloneCommand command = Git.cloneRepository()
-                    .setURI(repositoryUrl)
-                    .setDirectory(localPath.toFile())
+            if (readRemoteRefs(repositoryUrl).isEmpty()) {
+                throw new AppException("CLONE_FAILED", "Repository was not found or is not accessible.", 404);
+            }
+            Git git = Git.init()
                     .setBare(true)
-                    .setMirror(true)
-                    .setCloneAllBranches(true);
-            gitAuth.applyCredentials(command);
-            Git git = command.call();
+                    .setDirectory(localPath.toFile())
+                    .call();
             try {
-                fetchAllRefs(git);
+                StoredConfig config = git.getRepository().getConfig();
+                config.setString("remote", "origin", "url", repositoryUrl);
+                config.save();
             } finally {
                 git.close();
             }
@@ -165,12 +169,17 @@ class GitMirrorService {
     }
 
     void updateMirror(Path localPath) {
+        updateMirror(localPath, null);
+    }
+
+    void updateMirror(Path localPath, String inputRef) {
         try {
             Repository repository = GitSupport.openRepository(localPath);
             try {
+                String remoteRef = inputRef == null ? selectDefaultRemoteRef(repository) : resolveRemoteRef(repository, inputRef);
                 Git git = new Git(repository);
                 try {
-                    fetchAllRefs(git);
+                    fetchRef(git, remoteRef);
                 } finally {
                     git.close();
                 }
@@ -223,16 +232,85 @@ class GitMirrorService {
         }
     }
 
-    private void fetchAllRefs(Git git) throws GitAPIException {
-        List<RefSpec> refSpecs = new ArrayList<RefSpec>();
-        refSpecs.add(new RefSpec("+refs/heads/*:refs/remotes/origin/*"));
-        refSpecs.add(new RefSpec("+refs/tags/*:refs/tags/*"));
+    private void fetchRef(Git git, String remoteRef) throws GitAPIException {
+        if (remoteRef == null) {
+            return;
+        }
+        String localRef = remoteRef;
+        if (remoteRef.startsWith("refs/heads/")) {
+            localRef = "refs/remotes/origin/" + remoteRef.substring("refs/heads/".length());
+        }
         FetchCommand command = git.fetch()
                 .setRemote("origin")
                 .setRemoveDeletedRefs(true)
-                .setRefSpecs(refSpecs);
+                .setRefSpecs(new RefSpec("+" + remoteRef + ":" + localRef));
         gitAuth.applyCredentials(command);
         command.call();
+    }
+
+    private String selectDefaultRemoteRef(Repository repository) throws GitAPIException {
+        Set<String> refs = readRemoteRefNames(readRemoteUrl(repository));
+        for (String candidate : GitSupport.args("refs/heads/dev", "refs/heads/release", "refs/heads/prod", "refs/heads/master", "refs/heads/main")) {
+            if (refs.contains(candidate)) {
+                return candidate;
+            }
+        }
+        for (String ref : refs) {
+            if (ref.startsWith("refs/heads/")) {
+                return ref;
+            }
+        }
+        return null;
+    }
+
+    private String resolveRemoteRef(Repository repository, String inputRef) throws GitAPIException {
+        String normalizedInput = CoreUtils.safe(inputRef).trim();
+        Set<String> refs = readRemoteRefNames(readRemoteUrl(repository));
+        for (String candidate : remoteRefCandidates(normalizedInput)) {
+            if (refs.contains(candidate)) {
+                return candidate;
+            }
+        }
+        throw new AppException("REF_NOT_FOUND", "Requested branch or ref was not found.", 404);
+    }
+
+    private Set<String> readRemoteRefNames(String remoteUrl) throws GitAPIException {
+        Set<String> refs = new LinkedHashSet<String>();
+        for (Ref ref : readRemoteRefs(remoteUrl)) {
+            refs.add(ref.getName());
+        }
+        return refs;
+    }
+
+    private Collection<Ref> readRemoteRefs(String remoteUrl) throws GitAPIException {
+        org.eclipse.jgit.api.LsRemoteCommand command = Git.lsRemoteRepository()
+                .setRemote(remoteUrl)
+                .setHeads(true)
+                .setTags(true);
+        gitAuth.applyCredentials(command);
+        return command.call();
+    }
+
+    private List<String> remoteRefCandidates(String normalizedInput) {
+        List<String> candidates = new ArrayList<String>();
+        candidates.add(normalizedInput);
+        candidates.add("refs/heads/" + normalizedInput);
+        candidates.add("refs/tags/" + normalizedInput);
+        if (normalizedInput.startsWith("origin/")) {
+            candidates.add("refs/heads/" + normalizedInput.substring("origin/".length()));
+        }
+        if (normalizedInput.startsWith("refs/remotes/origin/")) {
+            candidates.add("refs/heads/" + normalizedInput.substring("refs/remotes/origin/".length()));
+        }
+        return candidates;
+    }
+
+    private String readRemoteUrl(Repository repository) {
+        String remoteUrl = repository.getConfig().getString("remote", "origin", "url");
+        if (CoreUtils.safe(remoteUrl).trim().isEmpty()) {
+            throw new AppException("BROKEN_REPOSITORY", "Remote repository URL is missing.", 409);
+        }
+        return remoteUrl;
     }
 
     private AppException mapGitFailure(String stderr, String defaultCode, String fallbackMessage) {
