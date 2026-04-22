@@ -32,16 +32,11 @@ The application servlet context is:
 /manager-tools
 ```
 
-Required environment:
+Optional environment:
 
 ```text
 GITLAB_BASE_URL=https://builder.reinform-int.ru/gitlab
 GITLAB_PAT=<personal access token>
-```
-
-Optional environment:
-
-```text
 MANAGER_TOOLS_STORAGE_ROOT=storage
 GIT_COMMAND_TIMEOUT_MS=300000
 SEARCH_MAX_QUERY_LENGTH=512

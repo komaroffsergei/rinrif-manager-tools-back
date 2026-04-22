@@ -31,12 +31,11 @@ class GitAuth {
     }
 
     List<String> cloneAndFetchArgs() {
-        if (config.gitLabPat == null) {
-            throw new AppException("AUTH_FAILED", "GitLab PAT is not configured.", 500);
-        }
         List<String> args = new ArrayList<String>();
-        args.add("-c");
-        args.add("http.extraHeader=Authorization: Basic " + encodedAuth());
+        if (config.gitLabPat != null) {
+            args.add("-c");
+            args.add("http.extraHeader=Authorization: Basic " + encodedAuth());
+        }
         return args;
     }
 
