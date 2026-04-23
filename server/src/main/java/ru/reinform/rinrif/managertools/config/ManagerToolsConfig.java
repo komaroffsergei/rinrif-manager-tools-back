@@ -14,6 +14,7 @@ public class ManagerToolsConfig {
     public ManagerToolsService managerToolsService(Environment environment) {
         Map<String, String> config = new LinkedHashMap<String, String>();
         put(config, "MANAGER_TOOLS_STORAGE_ROOT", environment.getProperty("manager-tools.storage-root"));
+        put(config, "MANAGER_TOOLS_ENV_FILE", environment.getProperty("manager-tools.env-file"));
         put(config, "GITLAB_BASE_URL", environment.getProperty("manager-tools.gitlab.base-url"));
         put(config, "GITLAB_PAT", environment.getProperty("manager-tools.gitlab.pat"));
         put(config, "GIT_COMMAND_TIMEOUT_MS", environment.getProperty("manager-tools.git.command-timeout-ms"));

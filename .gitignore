@@ -1,5 +1,7 @@
 target/
 storage/
+.env
+.env.*
 .idea/
 *.iml
 *.log

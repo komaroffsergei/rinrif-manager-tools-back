@@ -35,6 +35,7 @@ The application servlet context is:
 Optional environment:
 
 ```text
+MANAGER_TOOLS_ENV_FILE=.env
 GITLAB_BASE_URL=https://builder.reinform-int.ru/gitlab
 GITLAB_PAT=<personal access token>
 MANAGER_TOOLS_STORAGE_ROOT=storage
@@ -44,11 +45,14 @@ SEARCH_DEFAULT_MAX_COMMITS=30
 SEARCH_SCAN_LIMIT=1000
 ```
 
+If `MANAGER_TOOLS_ENV_FILE` is not set, the backend also reads an optional `.env` file from the current working directory. JVM properties and process environment variables take precedence over Spring config values; Spring config values take precedence over `.env`.
+
 The same values can be supplied by Spring Config Server through:
 
 ```yaml
 manager-tools:
   storage-root: storage
+  env-file: .env
   gitlab:
     base-url: https://builder.reinform-int.ru/gitlab
     pat: ${MANAGER_TOOLS_GITLAB_PAT:}
