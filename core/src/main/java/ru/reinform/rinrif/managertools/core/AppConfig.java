@@ -40,26 +40,39 @@ class AppConfig {
                 Integer.parseInt(readConfig(externalValues, "SEARCH_DEFAULT_MAX_COMMITS", "30")),
                 Integer.parseInt(readConfig(externalValues, "SEARCH_SCAN_LIMIT", "1000")),
                 readConfig(externalValues, "GITLAB_BASE_URL", null),
-                readConfig(externalValues, "GITLAB_PAT", null)
+                readGitLabPat(externalValues)
         );
     }
 
     private static String readConfig(Map<String, String> externalValues, String name, String defaultValue) {
         String propertyValue = System.getProperty(name);
-        if (propertyValue != null && !propertyValue.trim().isEmpty()) {
+        if (isUsableValue(propertyValue)) {
             return propertyValue.trim();
         }
         String envValue = System.getenv(name);
-        if (envValue != null && !envValue.trim().isEmpty()) {
+        if (isUsableValue(envValue)) {
             return envValue.trim();
         }
         if (externalValues != null) {
             String externalValue = externalValues.get(name);
-            if (externalValue != null && !externalValue.trim().isEmpty()) {
+            if (isUsableValue(externalValue)) {
                 return externalValue.trim();
             }
         }
         return defaultValue;
+    }
+
+    private static String readGitLabPat(Map<String, String> externalValues) {
+        String value = readConfig(externalValues, "GITLAB_PAT", null);
+        return value == null ? readConfig(externalValues, "MANAGER_TOOLS_GITLAB_PAT", null) : value;
+    }
+
+    private static boolean isUsableValue(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return false;
+        }
+        String trimmed = value.trim();
+        return !(trimmed.startsWith("${") && trimmed.endsWith("}"));
     }
 
     private static String resolveHost(String baseUrl) {
