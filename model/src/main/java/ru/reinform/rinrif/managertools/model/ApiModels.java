@@ -125,6 +125,7 @@ public final class ApiModels {
         public Boolean includeMerges;
         public Boolean firstParent;
         public Integer maxCommits;
+        public List<String> excludedFilePatterns = new ArrayList<String>();
     }
 
     public static class AddRepositoryRequest {

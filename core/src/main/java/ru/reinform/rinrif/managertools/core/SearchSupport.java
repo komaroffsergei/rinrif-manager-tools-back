@@ -2,8 +2,10 @@ package ru.reinform.rinrif.managertools.core;
 
 import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -196,6 +198,79 @@ class FileDiffRange {
 
     FileDiffRange(String path) {
         this.path = path;
+    }
+}
+
+class ExcludedFilePatterns {
+    final List<String> values;
+
+    private ExcludedFilePatterns(List<String> values) {
+        this.values = values;
+    }
+
+    static ExcludedFilePatterns from(List<String> input) {
+        Set<String> unique = new LinkedHashSet<String>();
+        for (String value : input == null ? new ArrayList<String>() : input) {
+            String normalized = CoreUtils.safe(value).trim();
+            if (!normalized.isEmpty()) {
+                unique.add(normalized);
+            }
+        }
+        return new ExcludedFilePatterns(new ArrayList<String>(unique));
+    }
+
+    boolean isExcluded(String path) {
+        String normalizedPath = normalizePath(path);
+        if (normalizedPath.isEmpty()) {
+            return false;
+        }
+        String basename = extractBasename(normalizedPath);
+        for (String pattern : values) {
+            String candidate = pattern.indexOf('/') >= 0 ? normalizedPath : basename;
+            if (GlobMatcher.matches(candidate, pattern)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String normalizePath(String path) {
+        return CoreUtils.safe(path).replace('\\', '/');
+    }
+
+    private static String extractBasename(String path) {
+        int separator = path.lastIndexOf('/');
+        return separator >= 0 ? path.substring(separator + 1) : path;
+    }
+}
+
+class GlobMatcher {
+    static boolean matches(String value, String pattern) {
+        return toRegex(pattern).matcher(CoreUtils.safe(value)).matches();
+    }
+
+    private static Pattern toRegex(String pattern) {
+        StringBuilder regex = new StringBuilder("^");
+        String source = CoreUtils.safe(pattern);
+        for (int i = 0; i < source.length(); i++) {
+            char current = source.charAt(i);
+            if (current == '*') {
+                boolean doubleStar = i + 1 < source.length() && source.charAt(i + 1) == '*';
+                if (doubleStar) {
+                    regex.append(".*");
+                    i++;
+                } else {
+                    regex.append("[^/]*");
+                }
+                continue;
+            }
+            if ("\\.[]{}()+-^$?|".indexOf(current) >= 0) {
+                regex.append('\\');
+            }
+            regex.append(current);
+        }
+        regex.append('$');
+        return Pattern.compile(regex.toString());
     }
 }
 

@@ -39,6 +39,8 @@ class SearchService {
 
     QueuedJobResponse startSearch(final SearchRequestPayload input) {
         validateSearchInput(input);
+        final ExcludedFilePatterns excludedPatterns = ExcludedFilePatterns.from(input.excludedFilePatterns);
+        input.excludedFilePatterns = excludedPatterns.values;
         final RepositoryRecord repository = repositoryRegistry.getRepository(input.repoId);
         @SuppressWarnings("unchecked")
         Map<String, Object> payload = mapper.convertValue(input, Map.class);
@@ -73,6 +75,7 @@ class SearchService {
             jobsStore.updateJob(jobId, JobStatus.searching_commits, "Searching commits", 0);
 
             SearchQuery query = SearchQueryParser.parse(input.query);
+            ExcludedFilePatterns excludedPatterns = ExcludedFilePatterns.from(input.excludedFilePatterns);
             int resultLimit = input.maxCommits == null ? config.searchDefaultMaxCommits : input.maxCommits;
             int scanLimit = Math.max(resultLimit * 20, config.searchScanLimit);
             GitLogOptions options = new GitLogOptions();
@@ -102,9 +105,10 @@ class SearchService {
 
             jobsStore.updateJob(jobId, JobStatus.building_diff_links, "Building change links", 0);
             SearchResult result = new SearchResult();
-            int count = Math.min(resultLimit, matches.size());
-            for (int i = 0; i < count; i++) {
-                CommitMatch match = matches.get(i);
+            for (CommitMatch match : matches) {
+                if (result.items.size() >= resultLimit) {
+                    break;
+                }
                 CommitSearchResult item = new CommitSearchResult();
                 item.sha = match.commit.sha;
                 item.subject = match.commit.subject;
@@ -114,9 +118,14 @@ class SearchService {
                 item.score = match.score;
                 item.commitUrl = urlBuilder.buildCommitUrl(refreshedRepository, match.commit.sha);
                 for (FileDiffRange file : collectFilesForCommit(refreshedRepository, match.commit.sha)) {
+                    if (excludedPatterns.isExcluded(file.path)) {
+                        continue;
+                    }
                     item.files.add(buildFileResult(refreshedRepository, match.commit.sha, file));
                 }
-                result.items.add(item);
+                if (!item.files.isEmpty()) {
+                    result.items.add(item);
+                }
             }
 
             RepositoryRecord latestRepository = repositoryRegistry.getRepository(repository.id);
