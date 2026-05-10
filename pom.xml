@@ -23,6 +23,7 @@
             <modules>
                 <module>model</module>
                 <module>core</module>
+                <module>atr2spec</module>
                 <module>server</module>
             </modules>
         </profile>

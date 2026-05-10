@@ -43,6 +43,15 @@ GIT_COMMAND_TIMEOUT_MS=300000
 SEARCH_MAX_QUERY_LENGTH=512
 SEARCH_DEFAULT_MAX_COMMITS=30
 SEARCH_SCAN_LIMIT=1000
+MANAGER_TOOLS_ATR2SPEC_ENV_FILE=E:\DEV\reinform\agent\.env\jira_backfill.env
+CONFLUENCE_BASE_URL=https://wiki.reinform-int.ru
+CONFLUENCE_USER=<login>
+CONFLUENCE_TOKEN=<token>
+JIRA_BASE_URL=https://jira.reinform-int.ru
+JIRA_USER=<login>
+JIRA_TOKEN=<token>
+ATR2SPEC_VERIFY_SSL=true
+ATR2SPEC_HTTP_TIMEOUT_MS=30000
 ```
 
 If `MANAGER_TOOLS_ENV_FILE` is not set, the backend also reads an optional `.env` file from the current working directory. JVM properties and process environment variables take precedence over Spring config values; Spring config values take precedence over `.env`.
@@ -62,4 +71,24 @@ manager-tools:
     max-query-length: 512
     default-max-commits: 30
     scan-limit: 1000
+  atr2spec:
+    env-file: ${MANAGER_TOOLS_ATR2SPEC_ENV_FILE:}
+    verify-ssl: true
+    http-timeout-ms: 30000
+    confluence:
+      base-url: https://wiki.reinform-int.ru
+      user: ${CONFLUENCE_USER:}
+      token: ${CONFLUENCE_TOKEN:}
+    jira:
+      base-url: https://jira.reinform-int.ru
+      user: ${JIRA_USER:}
+      token: ${JIRA_TOKEN:}
+```
+
+ATR2Spec local route:
+
+```text
+POST /app/rinrif/manager-tools/api/atr2spec/runs
+GET  /app/rinrif/manager-tools/api/atr2spec/runs/{jobId}
+GET  /app/rinrif/manager-tools/api/atr2spec/runs/{jobId}/draft
 ```

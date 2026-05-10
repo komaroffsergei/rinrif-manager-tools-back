@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import ru.reinform.rinrif.managertools.atr2spec.Atr2SpecException;
 import ru.reinform.rinrif.managertools.core.AppException;
 import ru.reinform.rinrif.managertools.model.ApiModels.AppError;
 
@@ -17,6 +18,13 @@ public class ApiExceptionHandler {
         Map<String, AppError> body = new LinkedHashMap<String, AppError>();
         body.put("error", exception.toAppError());
         return ResponseEntity.status(exception.getStatusCode()).body(body);
+    }
+
+    @ExceptionHandler(Atr2SpecException.class)
+    public ResponseEntity<Map<String, AppError>> handleAtr2SpecException(Atr2SpecException exception) {
+        Map<String, AppError> body = new LinkedHashMap<String, AppError>();
+        body.put("error", new AppError("ATR2SPEC_ERROR", exception.getMessage(), null));
+        return ResponseEntity.status(exception.getStatus()).body(body);
     }
 
     @ExceptionHandler(Exception.class)

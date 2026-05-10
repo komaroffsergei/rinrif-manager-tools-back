@@ -1,0 +1,31 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>ru.reinform.rinrif.manager-tools</groupId>
+    <artifactId>manager-tools-atr2spec</artifactId>
+    <version>internal</version>
+    <packaging>jar</packaging>
+    <name>manager-tools-atr2spec</name>
+
+    <parent>
+        <groupId>ru.reinform.cdp.maven-master</groupId>
+        <artifactId>lib-master</artifactId>
+        <version>5.0</version>
+        <relativePath/>
+    </parent>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.13.2</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

@@ -26,6 +26,11 @@
             <version>internal</version>
         </dependency>
         <dependency>
+            <groupId>ru.reinform.rinrif.manager-tools</groupId>
+            <artifactId>manager-tools-atr2spec</artifactId>
+            <version>internal</version>
+        </dependency>
+        <dependency>
             <groupId>ru.reinform.cdp.utils</groupId>
             <artifactId>utils-springboot-lib</artifactId>
         </dependency>
