@@ -21,8 +21,15 @@ class AppConfig {
     final String gitLabBaseUrl;
     final String gitLabHost;
     final String gitLabPat;
+    final String jiraBaseUrl;
+    final String jiraUser;
+    final String jiraToken;
+    final boolean verifySsl;
+    final int httpTimeoutMs;
 
-    AppConfig(Path storageRoot, long gitCommandTimeoutMs, int searchMaxQueryLength, int searchDefaultMaxCommits, int searchScanLimit, String gitLabBaseUrl, String gitLabPat) {
+    AppConfig(Path storageRoot, long gitCommandTimeoutMs, int searchMaxQueryLength, int searchDefaultMaxCommits, int searchScanLimit,
+              String gitLabBaseUrl, String gitLabPat, String jiraBaseUrl, String jiraUser, String jiraToken,
+              boolean verifySsl, int httpTimeoutMs) {
         this.storageRoot = storageRoot.toAbsolutePath();
         this.gitCommandTimeoutMs = gitCommandTimeoutMs;
         this.searchMaxQueryLength = searchMaxQueryLength;
@@ -31,6 +38,11 @@ class AppConfig {
         this.gitLabBaseUrl = emptyToNull(gitLabBaseUrl);
         this.gitLabPat = emptyToNull(gitLabPat);
         this.gitLabHost = resolveHost(this.gitLabBaseUrl);
+        this.jiraBaseUrl = trimRight(jiraBaseUrl, "/");
+        this.jiraUser = emptyToNull(jiraUser);
+        this.jiraToken = emptyToNull(jiraToken);
+        this.verifySsl = verifySsl;
+        this.httpTimeoutMs = httpTimeoutMs;
     }
 
     static AppConfig load() {
@@ -39,6 +51,8 @@ class AppConfig {
 
     static AppConfig load(Map<String, String> externalValues) {
         Map<String, String> envFileValues = readEnvFile(externalValues);
+        Map<String, String> jiraEnvValues = new LinkedHashMap<String, String>(envFileValues);
+        jiraEnvValues.putAll(readEnvFileAt(readHighPrecedenceConfig(externalValues, "MANAGER_TOOLS_ATR2SPEC_ENV_FILE")));
         return new AppConfig(
                 Paths.get(readConfig(externalValues, envFileValues, "MANAGER_TOOLS_STORAGE_ROOT", "storage")),
                 Long.parseLong(readConfig(externalValues, envFileValues, "GIT_COMMAND_TIMEOUT_MS", "300000")),
@@ -46,7 +60,15 @@ class AppConfig {
                 Integer.parseInt(readConfig(externalValues, envFileValues, "SEARCH_DEFAULT_MAX_COMMITS", "30")),
                 Integer.parseInt(readConfig(externalValues, envFileValues, "SEARCH_SCAN_LIMIT", "1000")),
                 readConfig(externalValues, envFileValues, "GITLAB_BASE_URL", null),
-                readGitLabPat(externalValues, envFileValues)
+                readGitLabPat(externalValues, envFileValues),
+                readConfig(externalValues, jiraEnvValues, "JIRA_BASE_URL", "https://jira.reinform-int.ru"),
+                readConfig(externalValues, jiraEnvValues, "JIRA_USER", readConfig(externalValues, jiraEnvValues, "JIRA_USERNAME", null)),
+                readConfig(externalValues, jiraEnvValues, "JIRA_TOKEN", readConfig(externalValues, jiraEnvValues, "JIRA_PASSWORD", null)),
+                Boolean.parseBoolean(readConfig(externalValues, jiraEnvValues, "ATR2SPEC_VERIFY_SSL",
+                        readConfig(externalValues, jiraEnvValues, "JIRA_VERIFY_SSL",
+                                readConfig(externalValues, jiraEnvValues, "CONFLUENCE_VERIFY_SSL", "true")))),
+                Integer.parseInt(readConfig(externalValues, jiraEnvValues, "ATR2SPEC_HTTP_TIMEOUT_MS",
+                        readConfig(externalValues, jiraEnvValues, "JIRA_HTTP_TIMEOUT_MS", "30000")))
         );
     }
 
@@ -123,6 +145,14 @@ class AppConfig {
     private static Map<String, String> readEnvFile(Map<String, String> externalValues) {
         String configuredPath = readHighPrecedenceConfig(externalValues, "MANAGER_TOOLS_ENV_FILE");
         Path envFile = configuredPath == null ? Paths.get(".env") : Paths.get(configuredPath);
+        return readEnvFileAt(envFile.toString());
+    }
+
+    private static Map<String, String> readEnvFileAt(String configuredPath) {
+        if (configuredPath == null || configuredPath.trim().isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Path envFile = Paths.get(configuredPath.trim());
         if (!Files.isRegularFile(envFile)) {
             return Collections.emptyMap();
         }
@@ -191,5 +221,13 @@ class AppConfig {
 
     private static String emptyToNull(String value) {
         return isUsableValue(value) ? value.trim() : null;
+    }
+
+    private static String trimRight(String value, String suffix) {
+        String result = value == null ? "" : value.trim();
+        while (result.endsWith(suffix)) {
+            result = result.substring(0, result.length() - suffix.length());
+        }
+        return result;
     }
 }

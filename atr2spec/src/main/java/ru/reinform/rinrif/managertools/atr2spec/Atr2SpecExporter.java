@@ -2,6 +2,11 @@ package ru.reinform.rinrif.managertools.atr2spec;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import ru.reinform.rinrif.managertools.core.JiraReadClient;
+import ru.reinform.rinrif.managertools.model.ApiModels.JiraCommentData;
+import ru.reinform.rinrif.managertools.model.ApiModels.JiraIssueData;
+import ru.reinform.rinrif.managertools.model.ApiModels.JiraIssueLinkData;
+import ru.reinform.rinrif.managertools.model.ApiModels.JiraRemoteLinkData;
 
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.HttpsURLConnection;
@@ -79,80 +84,60 @@ class Atr2SpecExporter {
     }
 
     Map<String, Object> exportJiraIssue(String jiraKey) {
-        requireAuth(config.jiraUser, config.jiraToken, "Jira");
-        String normalizedKey = jiraKey.trim().toUpperCase();
-        String fields = "summary,description,status,issuetype,project,labels,components,comment,issuelinks";
-        JsonNode issue = getJson(
-                config.jiraBaseUrl + "/rest/api/2/issue/" + encode(normalizedKey) + "?fields=" + encode(fields),
-                config.jiraUser,
-                config.jiraToken
-        );
-        JsonNode remoteLinksNode = getJson(
-                config.jiraBaseUrl + "/rest/api/2/issue/" + encode(normalizedKey) + "/remotelink",
-                config.jiraUser,
-                config.jiraToken
-        );
-        JsonNode fieldsNode = issue.get("fields");
-        String descriptionText = Atr2SpecTextUtils.flattenJiraText(fieldsNode == null ? null : fieldsNode.get("description"));
+        JiraIssueData issue = new JiraReadClient(
+                config.jiraBaseUrl, config.jiraUser, config.jiraToken, config.verifySsl, config.httpTimeoutMs, objectMapper
+        ).getIssue(jiraKey);
         List<Map<String, String>> comments = new ArrayList<Map<String, String>>();
-        JsonNode commentItems = fieldsNode == null ? null : fieldsNode.path("comment").path("comments");
-        if (commentItems != null && commentItems.isArray()) {
-            for (JsonNode item : commentItems) {
-                Map<String, String> comment = new LinkedHashMap<String, String>();
-                comment.put("author", firstFilled(textAt(item, "author", "displayName"), textAt(item, "author", "name")));
-                comment.put("created", textAt(item, "created"));
-                comment.put("body_text", Atr2SpecTextUtils.flattenJiraText(item.get("body")));
-                comments.add(comment);
-            }
+        for (JiraCommentData item : issue.comments) {
+            Map<String, String> comment = new LinkedHashMap<String, String>();
+            comment.put("author", item.author);
+            comment.put("created", item.created);
+            comment.put("body_text", item.body);
+            comments.add(comment);
         }
         List<Map<String, String>> remoteLinks = new ArrayList<Map<String, String>>();
-        if (remoteLinksNode != null && remoteLinksNode.isArray()) {
-            for (JsonNode item : remoteLinksNode) {
-                Map<String, String> link = new LinkedHashMap<String, String>();
-                link.put("title", textAt(item, "object", "title"));
-                link.put("url", textAt(item, "object", "url"));
-                remoteLinks.add(link);
-            }
+        for (JiraRemoteLinkData item : issue.remoteLinks) {
+            Map<String, String> link = new LinkedHashMap<String, String>();
+            link.put("title", item.title);
+            link.put("url", item.url);
+            remoteLinks.add(link);
         }
-        List<String> components = new ArrayList<String>();
-        JsonNode componentsNode = fieldsNode == null ? null : fieldsNode.get("components");
-        if (componentsNode != null && componentsNode.isArray()) {
-            for (JsonNode component : componentsNode) {
-                String name = textAt(component, "name");
-                if (!name.isEmpty()) {
-                    components.add(name);
-                }
-            }
-        }
-        List<String> labels = new ArrayList<String>();
-        JsonNode labelsNode = fieldsNode == null ? null : fieldsNode.get("labels");
-        if (labelsNode != null && labelsNode.isArray()) {
-            for (JsonNode label : labelsNode) {
-                labels.add(label.asText());
-            }
+        List<Map<String, String>> issueLinks = new ArrayList<Map<String, String>>();
+        for (JiraIssueLinkData item : issue.issueLinks) {
+            Map<String, String> link = new LinkedHashMap<String, String>();
+            link.put("task_key", item.key);
+            link.put("title", item.title);
+            link.put("relationship", item.relationship);
+            link.put("direction", item.direction);
+            link.put("url", item.url);
+            issueLinks.add(link);
         }
 
-        StringBuilder textForKeys = new StringBuilder(textAt(fieldsNode, "summary")).append('\n').append(descriptionText);
+        StringBuilder textForKeys = new StringBuilder(issue.title).append('\n').append(issue.description);
         for (Map<String, String> comment : comments) {
             textForKeys.append('\n').append(comment.get("body_text"));
         }
         for (Map<String, String> remoteLink : remoteLinks) {
             textForKeys.append('\n').append(remoteLink.get("url"));
         }
+        for (Map<String, String> issueLink : issueLinks) {
+            textForKeys.append('\n').append(issueLink.get("task_key"));
+        }
 
         Map<String, Object> result = Atr2SpecIo.map();
         result.put("source", "jira");
-        result.put("task_key", firstFilled(textAt(issue, "key"), normalizedKey));
-        result.put("title", textAt(fieldsNode, "summary"));
-        result.put("description_text", descriptionText);
-        result.put("status", textAt(fieldsNode, "status", "name"));
-        result.put("issue_type", textAt(fieldsNode, "issuetype", "name"));
-        result.put("project_key", textAt(fieldsNode, "project", "key"));
-        result.put("labels", labels);
-        result.put("components", components);
+        result.put("task_key", issue.key);
+        result.put("title", issue.title);
+        result.put("description_text", issue.description);
+        result.put("status", issue.status);
+        result.put("issue_type", issue.issueType);
+        result.put("project_key", issue.projectKey);
+        result.put("labels", issue.labels);
+        result.put("components", issue.components);
         result.put("comments", comments);
+        result.put("issue_links", issueLinks);
         result.put("remote_links", remoteLinks);
-        result.put("source_url", config.jiraBaseUrl + "/browse/" + firstFilled(textAt(issue, "key"), normalizedKey));
+        result.put("source_url", issue.url);
         result.put("jira_keys", Atr2SpecTextUtils.extractJiraKeys(textForKeys.toString()));
         result.put("mgsn_keys", Atr2SpecTextUtils.extractMgsnKeys(textForKeys.toString()));
         result.put("exported_at", Atr2SpecIo.nowIso());

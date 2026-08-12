@@ -1,6 +1,8 @@
 package ru.reinform.rinrif.managertools.core;
 
+import java.io.ByteArrayOutputStream;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -127,11 +129,11 @@ class DiffRangeParser {
                 continue;
             }
             if (line.startsWith("rename to ")) {
-                current.path = line.substring("rename to ".length()).trim();
+                current.path = decodeGitPath(line.substring("rename to ".length()).trim());
                 continue;
             }
             if (line.startsWith("+++ ") && !line.equals("+++ /dev/null")) {
-                current.path = line.substring("+++ b/".length()).trim();
+                current.path = stripSidePrefix(decodeGitPath(line.substring("+++ ".length()).trim()), "b/");
                 continue;
             }
             if (line.startsWith("Binary files ") || line.startsWith("GIT binary patch") || line.startsWith("Binary file ")) {
@@ -172,9 +174,106 @@ class DiffRangeParser {
     }
 
     private static String parsePathFromDiffHeader(String line) {
-        String[] parts = line.split(" ");
-        String rawPath = parts.length > 3 ? parts[3] : "";
-        return rawPath.startsWith("b/") ? rawPath.substring(2) : rawPath;
+        List<String> paths = splitGitPathTokens(line.substring("diff --git ".length()));
+        String rawPath = paths.size() > 1 ? paths.get(1) : "";
+        return stripSidePrefix(decodeGitPath(rawPath), "b/");
+    }
+
+    private static List<String> splitGitPathTokens(String value) {
+        List<String> result = new ArrayList<String>();
+        int index = 0;
+        while (index < value.length()) {
+            while (index < value.length() && Character.isWhitespace(value.charAt(index))) {
+                index++;
+            }
+            if (index >= value.length()) {
+                break;
+            }
+            int start = index;
+            if (value.charAt(index) == '"') {
+                index++;
+                boolean escaped = false;
+                while (index < value.length()) {
+                    char current = value.charAt(index++);
+                    if (current == '"' && !escaped) {
+                        break;
+                    }
+                    if (current == '\\' && !escaped) {
+                        escaped = true;
+                    } else {
+                        escaped = false;
+                    }
+                }
+            } else {
+                while (index < value.length() && !Character.isWhitespace(value.charAt(index))) {
+                    index++;
+                }
+            }
+            result.add(value.substring(start, index));
+        }
+        return result;
+    }
+
+    /** Decodes Git's core.quotePath C-style quoting, including octal UTF-8 bytes. */
+    static String decodeGitPath(String rawPath) {
+        String value = CoreUtils.safe(rawPath).trim();
+        if (value.length() < 2 || value.charAt(0) != '"' || value.charAt(value.length() - 1) != '"') {
+            return value;
+        }
+        String body = value.substring(1, value.length() - 1);
+        ByteArrayOutputStream decoded = new ByteArrayOutputStream(body.length());
+        int index = 0;
+        while (index < body.length()) {
+            int slash = body.indexOf('\\', index);
+            if (slash < 0) {
+                writeUtf8(decoded, body.substring(index));
+                break;
+            }
+            writeUtf8(decoded, body.substring(index, slash));
+            index = slash + 1;
+            if (index >= body.length()) {
+                decoded.write('\\');
+                break;
+            }
+            char escaped = body.charAt(index++);
+            if (escaped >= '0' && escaped <= '7') {
+                int octal = escaped - '0';
+                int digits = 1;
+                while (digits < 3 && index < body.length()) {
+                    char next = body.charAt(index);
+                    if (next < '0' || next > '7') {
+                        break;
+                    }
+                    octal = (octal * 8) + (next - '0');
+                    index++;
+                    digits++;
+                }
+                decoded.write(octal & 0xff);
+                continue;
+            }
+            switch (escaped) {
+                case 'a': decoded.write(7); break;
+                case 'b': decoded.write('\b'); break;
+                case 't': decoded.write('\t'); break;
+                case 'n': decoded.write('\n'); break;
+                case 'v': decoded.write(11); break;
+                case 'f': decoded.write('\f'); break;
+                case 'r': decoded.write('\r'); break;
+                case '\\': decoded.write('\\'); break;
+                case '"': decoded.write('"'); break;
+                default: writeUtf8(decoded, String.valueOf(escaped)); break;
+            }
+        }
+        return new String(decoded.toByteArray(), StandardCharsets.UTF_8);
+    }
+
+    private static void writeUtf8(ByteArrayOutputStream output, String value) {
+        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+        output.write(bytes, 0, bytes.length);
+    }
+
+    private static String stripSidePrefix(String path, String prefix) {
+        return path.startsWith(prefix) ? path.substring(prefix.length()) : path;
     }
 
     private static LineRange parseUnifiedHunk(String line) {

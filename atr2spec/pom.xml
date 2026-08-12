@@ -18,6 +18,11 @@
 
     <dependencies>
         <dependency>
+            <groupId>ru.reinform.rinrif.manager-tools</groupId>
+            <artifactId>manager-tools-core</artifactId>
+            <version>internal</version>
+        </dependency>
+        <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
         </dependency>

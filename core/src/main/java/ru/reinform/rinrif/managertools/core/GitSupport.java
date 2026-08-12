@@ -21,6 +21,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import ru.reinform.rinrif.managertools.model.ApiModels.RepositoryRef;
+import ru.reinform.rinrif.managertools.model.ApiModels.RepositoryRefsResponse;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -265,6 +267,53 @@ class GitMirrorService {
         }
     }
 
+    RepositoryRefsResponse listRemoteRefs(String repositoryUrl, String repositoryId) {
+        try {
+            RepositoryRefsResponse response = new RepositoryRefsResponse();
+            response.repositoryId = repositoryId;
+            for (Ref ref : readRemoteRefs(repositoryUrl)) {
+                String fullName = ref.getName();
+                if (fullName.endsWith("^{}")) {
+                    continue;
+                }
+                RepositoryRef item = new RepositoryRef();
+                item.fullName = fullName;
+                if (fullName.startsWith("refs/heads/")) {
+                    item.type = "branch";
+                    item.name = fullName.substring("refs/heads/".length());
+                } else if (fullName.startsWith("refs/tags/")) {
+                    item.type = "tag";
+                    item.name = fullName.substring("refs/tags/".length());
+                } else {
+                    continue;
+                }
+                item.sha = ref.getObjectId() == null ? null : ref.getObjectId().getName();
+                response.items.add(item);
+            }
+            Collections.sort(response.items, new java.util.Comparator<RepositoryRef>() {
+                @Override
+                public int compare(RepositoryRef left, RepositoryRef right) {
+                    if (!CoreUtils.safe(left.type).equals(CoreUtils.safe(right.type))) {
+                        return "branch".equals(left.type) ? -1 : 1;
+                    }
+                    return CoreUtils.safe(left.name).compareToIgnoreCase(CoreUtils.safe(right.name));
+                }
+            });
+            for (String preferred : GitSupport.args("prod", "release", "dev", "master", "main")) {
+                for (RepositoryRef item : response.items) {
+                    if ("branch".equals(item.type) && preferred.equals(item.name)) {
+                        response.defaultRef = preferred;
+                        return response;
+                    }
+                }
+            }
+            response.defaultRef = response.items.isEmpty() ? null : response.items.get(0).name;
+            return response;
+        } catch (GitAPIException error) {
+            throw mapGitFailure(redact(error.getMessage()), "REFS_FAILED", "Failed to read repository refs");
+        }
+    }
+
     private void fetchRef(Git git, String remoteRef) throws GitAPIException {
         if (remoteRef == null) {
             return;
@@ -403,6 +452,67 @@ class GitRefsService {
             }
         }
         throw new AppException("REF_NOT_FOUND", "Requested branch or ref was not found.", 404);
+    }
+
+    RepositoryRefsResponse listRefs(Path localPath, String repositoryId) {
+        Repository repository = null;
+        try {
+            repository = GitSupport.openRepository(localPath);
+            RepositoryRefsResponse response = new RepositoryRefsResponse();
+            response.repositoryId = repositoryId;
+            Set<String> seen = new HashSet<String>();
+            for (Ref ref : repository.getAllRefs().values()) {
+                String fullName = ref.getName();
+                String type;
+                String name;
+                if (fullName.startsWith("refs/remotes/origin/")) {
+                    type = "branch";
+                    name = fullName.substring("refs/remotes/origin/".length());
+                } else if (fullName.startsWith("refs/heads/")) {
+                    type = "branch";
+                    name = fullName.substring("refs/heads/".length());
+                } else if (fullName.startsWith("refs/tags/")) {
+                    type = "tag";
+                    name = fullName.substring("refs/tags/".length());
+                } else {
+                    continue;
+                }
+                if ("HEAD".equals(name) || !seen.add(type + ":" + name)) {
+                    continue;
+                }
+                RepositoryRef item = new RepositoryRef();
+                item.name = name;
+                item.fullName = fullName;
+                item.type = type;
+                item.sha = ref.getObjectId() == null ? null : ref.getObjectId().getName();
+                response.items.add(item);
+            }
+            Collections.sort(response.items, new java.util.Comparator<RepositoryRef>() {
+                @Override
+                public int compare(RepositoryRef left, RepositoryRef right) {
+                    if (!CoreUtils.safe(left.type).equals(CoreUtils.safe(right.type))) {
+                        return "branch".equals(left.type) ? -1 : 1;
+                    }
+                    return CoreUtils.safe(left.name).compareToIgnoreCase(CoreUtils.safe(right.name));
+                }
+            });
+            for (String preferred : GitSupport.args("prod", "release", "dev", "master", "main")) {
+                for (RepositoryRef item : response.items) {
+                    if ("branch".equals(item.type) && preferred.equals(item.name)) {
+                        response.defaultRef = item.name;
+                        return response;
+                    }
+                }
+            }
+            response.defaultRef = response.items.isEmpty() ? null : response.items.get(0).name;
+            return response;
+        } catch (IOException error) {
+            throw new AppException("REFS_UNAVAILABLE", "Не удалось получить ветки репозитория.", 503);
+        } finally {
+            if (repository != null) {
+                repository.close();
+            }
+        }
     }
 }
 

@@ -40,6 +40,25 @@ class RepoQueueManager {
         return new QueueTaskHandle(queuePosition, completion);
     }
 
+    QueueTaskHandle enqueue(String repoId, RunnableTask task) {
+        RepoQueue queue = getOrCreateQueue(repoId);
+        CompletableFuture<Void> completion = new CompletableFuture<Void>();
+        QueueItem item = new QueueItem(null, task, completion);
+        int queuePosition;
+        synchronized (queue) {
+            if (queue.active != null) {
+                queue.pending.add(item);
+                queuePosition = queue.pending.size();
+            } else {
+                queue.active = item;
+                queuePosition = 0;
+                runActive(repoId, queue);
+            }
+            refreshPendingPositions(queue);
+        }
+        return new QueueTaskHandle(queuePosition, completion);
+    }
+
     private RepoQueue getOrCreateQueue(String repoId) {
         RepoQueue existing = queues.get(repoId);
         if (existing != null) {
@@ -64,14 +83,19 @@ class RepoQueueManager {
                 try {
                     active.task.run();
                     active.completion.complete(null);
-                } catch (RuntimeException error) {
+                } catch (Throwable error) {
+                    // A linkage error (for example, an API mismatch in a runtime dependency)
+                    // must never leave callers waiting forever. Complete first so the queue can
+                    // advance even when the task failed outside the RuntimeException hierarchy.
                     active.completion.completeExceptionally(error);
                 } finally {
                     synchronized (queue) {
                         queue.active = queue.pending.poll();
                         refreshPendingPositions(queue);
                         if (queue.active != null) {
-                            jobsStore.updateJob(queue.active.jobId, JobStatus.running, "Operation is running", 0);
+                            if (queue.active.jobId != null) {
+                                jobsStore.updateJob(queue.active.jobId, JobStatus.running, "Operation is running", 0);
+                            }
                             runActive(repoId, queue);
                         } else {
                             queues.remove(repoId);
@@ -85,7 +109,9 @@ class RepoQueueManager {
     private void refreshPendingPositions(RepoQueue queue) {
         int index = 1;
         for (QueueItem item : queue.pending) {
-            jobsStore.updateJob(item.jobId, JobStatus.queued, "Operation queued", index);
+            if (item.jobId != null) {
+                jobsStore.updateJob(item.jobId, JobStatus.queued, "Operation queued", index);
+            }
             index++;
         }
     }

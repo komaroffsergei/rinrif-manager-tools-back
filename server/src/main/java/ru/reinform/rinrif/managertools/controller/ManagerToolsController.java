@@ -15,6 +15,10 @@ import ru.reinform.rinrif.managertools.model.ApiModels.QueuedJobResponse;
 import ru.reinform.rinrif.managertools.model.ApiModels.RepositoryRecord;
 import ru.reinform.rinrif.managertools.model.ApiModels.SearchJobRecord;
 import ru.reinform.rinrif.managertools.model.ApiModels.SearchRequestPayload;
+import ru.reinform.rinrif.managertools.model.ApiModels.ReleaseTraceQueuedResponse;
+import ru.reinform.rinrif.managertools.model.ApiModels.ReleaseTraceRunRecord;
+import ru.reinform.rinrif.managertools.model.ApiModels.ReleaseTraceRunRequest;
+import ru.reinform.rinrif.managertools.model.ApiModels.RepositoryRefsResponse;
 
 import java.util.List;
 
@@ -61,5 +65,20 @@ public class ManagerToolsController {
     @GetMapping("/jobs/{jobId}")
     public SearchJobRecord getJob(@PathVariable String jobId) {
         return managerToolsService.getJob(jobId);
+    }
+
+    @PostMapping("/release-trace/runs")
+    public ReleaseTraceQueuedResponse startReleaseTrace(@RequestBody ReleaseTraceRunRequest request) {
+        return managerToolsService.startReleaseTrace(request);
+    }
+
+    @GetMapping("/release-trace/runs/{runId}")
+    public ReleaseTraceRunRecord getReleaseTrace(@PathVariable String runId) {
+        return managerToolsService.getReleaseTrace(runId);
+    }
+
+    @GetMapping("/repositories/{repoId}/refs")
+    public RepositoryRefsResponse getRepositoryRefs(@PathVariable String repoId) {
+        return managerToolsService.getRepositoryRefs(repoId);
     }
 }

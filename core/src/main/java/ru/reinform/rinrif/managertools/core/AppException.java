@@ -31,13 +31,15 @@ public class AppException extends RuntimeException {
     }
 
     public AppError toAppError() {
-        return new AppError(code, getMessage(), details);
+        // Internal diagnostics can contain repository URLs, credentials or absolute paths.
+        // Keep them available to server-side code, but never serialize them to an API client.
+        return new AppError(code, getMessage(), null);
     }
 
     public static AppError toAppError(Throwable error) {
         if (error instanceof AppException) {
             return ((AppException) error).toAppError();
         }
-        return new AppError("INTERNAL_ERROR", "Internal server error.", error.getMessage());
+        return new AppError("INTERNAL_ERROR", "Internal server error.", null);
     }
 }

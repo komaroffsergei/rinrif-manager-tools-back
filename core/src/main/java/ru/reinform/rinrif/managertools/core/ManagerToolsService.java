@@ -11,6 +11,10 @@ import ru.reinform.rinrif.managertools.model.ApiModels.RepositoryStatus;
 import ru.reinform.rinrif.managertools.model.ApiModels.SearchJobRecord;
 import ru.reinform.rinrif.managertools.model.ApiModels.SearchRequestPayload;
 import ru.reinform.rinrif.managertools.model.ApiModels.SearchResult;
+import ru.reinform.rinrif.managertools.model.ApiModels.ReleaseTraceQueuedResponse;
+import ru.reinform.rinrif.managertools.model.ApiModels.ReleaseTraceRunRecord;
+import ru.reinform.rinrif.managertools.model.ApiModels.ReleaseTraceRunRequest;
+import ru.reinform.rinrif.managertools.model.ApiModels.RepositoryRefsResponse;
 
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -29,6 +33,7 @@ public class ManagerToolsService {
     private final RepoQueueManager queueManager;
     private final RepositoryManager repositoryManager;
     private final SearchService searchService;
+    private final ReleaseTraceService releaseTraceService;
 
     public ManagerToolsService() {
         this(AppConfig.load());
@@ -51,6 +56,10 @@ public class ManagerToolsService {
                 new GitLogService()
         );
         this.searchService = new SearchService(config, repositoryRegistry, repositoryManager, queueManager, jobsStore);
+        this.releaseTraceService = new ReleaseTraceService(
+                config, repositoryRegistry, repositoryManager, queueManager,
+                new ReleaseTraceStore(config.storageRoot, objectMapper), objectMapper
+        );
         this.repositoryRegistry.ensureInitialized();
     }
 
@@ -139,6 +148,18 @@ public class ManagerToolsService {
 
     public SearchJobRecord getJob(String jobId) {
         return jobsStore.getJob(jobId);
+    }
+
+    public ReleaseTraceQueuedResponse startReleaseTrace(ReleaseTraceRunRequest request) {
+        return releaseTraceService.start(request);
+    }
+
+    public ReleaseTraceRunRecord getReleaseTrace(String runId) {
+        return releaseTraceService.get(runId);
+    }
+
+    public RepositoryRefsResponse getRepositoryRefs(String repoId) {
+        return releaseTraceService.getRefs(repoId);
     }
 
     private void executeClone(String repoId, String jobId, String cloneUrl) {

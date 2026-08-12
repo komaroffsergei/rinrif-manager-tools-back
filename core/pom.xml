@@ -29,7 +29,14 @@
         <dependency>
             <groupId>org.eclipse.jgit</groupId>
             <artifactId>org.eclipse.jgit</artifactId>
-            <version>5.13.0.202109080827-r</version>
+            <!-- Keep compile-time API identical to the version packaged by manager-tools-server. -->
+            <version>4.11.0.201803080745-r</version>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.13.2</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>

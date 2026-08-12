@@ -16,12 +16,18 @@ public class ManagerToolsConfig {
         Map<String, String> config = new LinkedHashMap<String, String>();
         put(config, "MANAGER_TOOLS_STORAGE_ROOT", environment.getProperty("manager-tools.storage-root"));
         put(config, "MANAGER_TOOLS_ENV_FILE", environment.getProperty("manager-tools.env-file"));
+        put(config, "MANAGER_TOOLS_ATR2SPEC_ENV_FILE", environment.getProperty("manager-tools.atr2spec.env-file"));
         put(config, "GITLAB_BASE_URL", environment.getProperty("manager-tools.gitlab.base-url"));
         put(config, "GITLAB_PAT", environment.getProperty("manager-tools.gitlab.pat"));
         put(config, "GIT_COMMAND_TIMEOUT_MS", environment.getProperty("manager-tools.git.command-timeout-ms"));
         put(config, "SEARCH_MAX_QUERY_LENGTH", environment.getProperty("manager-tools.search.max-query-length"));
         put(config, "SEARCH_DEFAULT_MAX_COMMITS", environment.getProperty("manager-tools.search.default-max-commits"));
         put(config, "SEARCH_SCAN_LIMIT", environment.getProperty("manager-tools.search.scan-limit"));
+        put(config, "JIRA_BASE_URL", environment.getProperty("manager-tools.atr2spec.jira.base-url"));
+        put(config, "JIRA_USER", environment.getProperty("manager-tools.atr2spec.jira.user"));
+        put(config, "JIRA_TOKEN", environment.getProperty("manager-tools.atr2spec.jira.token"));
+        put(config, "ATR2SPEC_VERIFY_SSL", environment.getProperty("manager-tools.atr2spec.verify-ssl"));
+        put(config, "ATR2SPEC_HTTP_TIMEOUT_MS", environment.getProperty("manager-tools.atr2spec.http-timeout-ms"));
         return new ManagerToolsService(config);
     }
 
