@@ -1,94 +1,43 @@
-# Manager Tools Backend
+# Manager Tools — backend
 
-Java backend for the RINRIF Manager Tools Angular frontend.
+Java backend служебных инструментов GitCut и ATR2Spec.
 
-The project follows the RINRIF backend layout used by `adm`: Maven multi-module root with `model`, `core`, `remote-api`, and `server` modules.
+Приватный архив и описание работы Сергея Комарова. [Общий каталог](https://github.com/komaroffsergei/rinrif-portfolio).
 
-## Runtime
+## Назначение
 
-- Java 8
-- Maven 3.5.2
-- Repository operations are executed through embedded JGit
+- Поиск изменений в GitLab
+- Подготовка черновика постановки из АТР
+- API, модели и отчёты трассировки релизов
 
-## Local Run
+## Технологии
 
-Run the `server` module with `bootstrap-local.yml`.
+Java, Maven.
 
-The local context path is:
+## Мой вклад
 
-```text
-http://127.0.0.1:6756/app/rinrif/manager-tools
-```
+В истории подтверждены следующие изменения под моими Git-идентичностями:
 
-The deploy context behind Nginx is:
+- Add ATR2Spec backend module. [Изменение](https://github.com/komaroffsergei/rinrif-manager-tools-back/commit/e5e1b35b60261bb21fb1c72ca8fa01a0504ea75c).
+- Поддержать скрытые файлы в поиске GitCut. [Изменение](https://github.com/komaroffsergei/rinrif-manager-tools-back/commit/858a0f9345eec0e865ce99f4af4f0543e2ee5422).
+- Raise backend version for PAT env fallback. [Изменение](https://github.com/komaroffsergei/rinrif-manager-tools-back/commit/94e0227e19afd1df8318128b1d9f41c54602fa10).
+- Fix GitLab PAT config fallback. [Изменение](https://github.com/komaroffsergei/rinrif-manager-tools-back/commit/c9616c0f758e9620dc9f66e96b60f66ab9c49c42).
+- Переданы credentials из GitLab URL. [Изменение](https://github.com/komaroffsergei/rinrif-manager-tools-back/commit/1c5487977c74dc2ee7987244a680ddc4c1ce3b26).
+- Поддержан приватный URL для GitLab. [Изменение](https://github.com/komaroffsergei/rinrif-manager-tools-back/commit/2386e6cb65f66ba1867d5de86ef9d423fbec74c7).
+- Ограничен fetch целевой веткой. [Изменение](https://github.com/komaroffsergei/rinrif-manager-tools-back/commit/d79bbe57d1d82eb0542d9bd42590c3122cd08db0).
+- Исправлен вызов открытия Git-репозитория. [Изменение](https://github.com/komaroffsergei/rinrif-manager-tools-back/commit/2b7176e44f7defa1dc48fc4ac8c9ce611596dc34).
 
-```text
-/app/rinrif/manager-tools
-```
+Учтено **17 коммитов без merge** во всех сохранённых ветках. Cherry-pick одного изменения может иметь несколько хешей; число коммитов не равно числу задач. Авторство сопоставлено с `skomarov@reinform.ru` и `init.reg@gmail.com` по подтверждению владельца. Архивные снимки и подготовка этого README в статистику разработки не включены.
 
-The application servlet context is:
+[Подробности и ссылки на коммиты](docs/portfolio/contribution.md) · [Архитектура и запуск](docs/portfolio/project.md) · [История переноса](docs/portfolio/history.md)
 
-```text
-/manager-tools
-```
+## Скриншоты
 
-Optional environment:
+![Структура контрактов и модулей](docs/portfolio/screenshots/evidence-1.png)
 
-```text
-MANAGER_TOOLS_ENV_FILE=.env
-GITLAB_BASE_URL=https://builder.reinform-int.ru/gitlab
-GITLAB_PAT=<personal access token>
-MANAGER_TOOLS_STORAGE_ROOT=storage
-GIT_COMMAND_TIMEOUT_MS=300000
-SEARCH_MAX_QUERY_LENGTH=512
-SEARCH_DEFAULT_MAX_COMMITS=30
-SEARCH_SCAN_LIMIT=1000
-MANAGER_TOOLS_ATR2SPEC_ENV_FILE=E:\DEV\reinform\agent\.env\jira_backfill.env
-CONFLUENCE_BASE_URL=https://wiki.reinform-int.ru
-CONFLUENCE_USER=<login>
-CONFLUENCE_TOKEN=<token>
-JIRA_BASE_URL=https://jira.reinform-int.ru
-JIRA_USER=<login>
-JIRA_TOKEN=<token>
-ATR2SPEC_VERIFY_SSL=true
-ATR2SPEC_HTTP_TIMEOUT_MS=30000
-```
+![История личного вклада](docs/portfolio/screenshots/evidence-2.png)
 
-If `MANAGER_TOOLS_ENV_FILE` is not set, the backend also reads an optional `.env` file from the current working directory. JVM properties and process environment variables take precedence over Spring config values; Spring config values take precedence over `.env`.
 
-The same values can be supplied by Spring Config Server through:
+[Источник, версия и ограничения снимков](docs/portfolio/verification.md).
 
-```yaml
-manager-tools:
-  storage-root: storage
-  env-file: .env
-  gitlab:
-    base-url: https://builder.reinform-int.ru/gitlab
-    pat: ${MANAGER_TOOLS_GITLAB_PAT:}
-  git:
-    command-timeout-ms: 300000
-  search:
-    max-query-length: 512
-    default-max-commits: 30
-    scan-limit: 1000
-  atr2spec:
-    env-file: ${MANAGER_TOOLS_ATR2SPEC_ENV_FILE:}
-    verify-ssl: true
-    http-timeout-ms: 30000
-    confluence:
-      base-url: https://wiki.reinform-int.ru
-      user: ${CONFLUENCE_USER:}
-      token: ${CONFLUENCE_TOKEN:}
-    jira:
-      base-url: https://jira.reinform-int.ru
-      user: ${JIRA_USER:}
-      token: ${JIRA_TOKEN:}
-```
-
-ATR2Spec local route:
-
-```text
-POST /app/rinrif/manager-tools/api/atr2spec/runs
-GET  /app/rinrif/manager-tools/api/atr2spec/runs/{jobId}
-GET  /app/rinrif/manager-tools/api/atr2spec/runs/{jobId}/draft
-```
+[Исходная документация проекта](docs/portfolio/original-readme.md) сохранена отдельно.
